@@ -1,0 +1,50 @@
+#include <LiquidCrystal.h>
+#include <DHT.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+// DHT22
+#define DHTPIN 6
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+
+// DS18B20
+#define ONE_WIRE_BUS A0
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  lcd.begin(16, 2);
+  dht.begin();
+  sensors.begin();
+  Serial.begin(9600);
+}
+
+void loop() {
+  // DS18B20
+  sensors.requestTemperatures();
+  float tempDS = sensors.getTempCByIndex(0);
+
+  // DHT22
+  float tempDHT = dht.readTemperature();
+
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("DHT22:");
+  if (isnan(tempDHT)) {
+    lcd.print("Error");
+  } else {
+    lcd.print(tempDHT, 1);
+    lcd.print("C");
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.print("DS18B20:");
+  lcd.print(tempDS, 1);
+  lcd.print("C");
+
+  delay(2000);
+}
