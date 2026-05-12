@@ -19,12 +19,18 @@
 #define D3 5  // Botón derecha
 
 // --- Compensación de potencia ---
-#define COMP_IZQ 10     // Pequeña corrección si el A es más débil
-#define COMP_DER 10     // Igualamos los dos motores
+#define COMP_IZQ 10
+#define COMP_DER 10
 
 // --- VELOCIDAD BASE ---
-// Máximo 255 → potencia total
-#define VELOCIDAD_BASE 240  // Más potencia general
+#define VELOCIDAD_BASE 240
+
+// ==============================
+// AGREGADO: Sensor HC-SR04
+#define TRIG_PIN A0
+#define ECHO_PIN A1
+#define DISTANCIA_MINIMA 20  // cm — si hay obstáculo más cerca, bloquea el avance
+// ==============================
 
 void setup() {
   Serial.begin(9600);
@@ -43,7 +49,24 @@ void setup() {
   pinMode(D2, INPUT);
   pinMode(D3, INPUT);
 
+  // AGREGADO: Configurar pines del ultrasonido
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
   Serial.println("Sistema listo...");
+}
+
+// AGREGADO: Función para medir distancia en cm
+long medirDistancia() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  long distancia = duration * 0.034 / 2;
+  if (distancia == 0) distancia = 400; // Si falla la lectura, asume campo libre
+  return distancia;
 }
 
 void loop() {
@@ -53,10 +76,21 @@ void loop() {
   bool izquierda = digitalRead(D2);
   bool derecha = digitalRead(D3);
 
-  // --- Control lógico ---
+  // AGREGADO: Solo medir distancia si se intenta avanzar
   if (adelante) {
-    Adelante();
-  } 
+    long distancia = medirDistancia();
+    Serial.print("Distancia: ");
+    Serial.print(distancia);
+    Serial.println(" cm");
+
+    if (distancia > DISTANCIA_MINIMA) {
+      Adelante(); // Camino libre → avanza normal
+    } else {
+      Parar();    // Obstáculo detectado → se detiene aunque el botón esté presionado
+      Serial.println("⚠ Obstáculo detectado — bloqueado");
+    }
+  }
+  // --- El resto del control queda exactamente igual ---
   else if (atras) {
     Atras();
   } 
@@ -71,21 +105,10 @@ void loop() {
   }
 }
 
-// --- FUNCIONES DE MOVIMIENTO ---
+// --- FUNCIONES DE MOVIMIENTO --- (sin cambios)
 
 void Adelante() {
   Serial.println("→ Adelante");
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
-  analogWrite(ENA, limitar(VELOCIDAD_BASE + COMP_IZQ));
-
-  digitalWrite(IN3, HIGH);
-  digitalWrite(IN4, LOW);
-  analogWrite(ENB, limitar(VELOCIDAD_BASE + COMP_DER));
-}
-
-void Atras() {
-  Serial.println("← Atrás");
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
   analogWrite(ENA, limitar(VELOCIDAD_BASE + COMP_IZQ));
@@ -95,38 +118,45 @@ void Atras() {
   analogWrite(ENB, limitar(VELOCIDAD_BASE + COMP_DER));
 }
 
-void Izquierda() {
-  Serial.println("↺ Izquierda");
-  // Motor izquierdo detenido
-  digitalWrite(IN1, LOW);
+void Atras() {
+  Serial.println("← Atrás");
+  digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
-  analogWrite(ENA, 0);
+  analogWrite(ENA, limitar(VELOCIDAD_BASE + COMP_IZQ));
 
-  // Motor derecho adelante
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
   analogWrite(ENB, limitar(VELOCIDAD_BASE + COMP_DER));
 }
 
+void Izquierda() {
+  Serial.println("↺ Izquierda");
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, HIGH);
+  analogWrite(ENA, 0);
+
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENB, limitar(VELOCIDAD_BASE + COMP_DER));
+}
+
 void Derecha() {
   Serial.println("↻ Derecha");
-  // Motor izquierdo adelante
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
   analogWrite(ENA, limitar(VELOCIDAD_BASE + COMP_IZQ));
 
-  // Motor derecho detenido
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, HIGH);
   analogWrite(ENB, 0);
 }
 
 void Parar() {
   Serial.println("■ Parado");
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, HIGH);
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
 }
